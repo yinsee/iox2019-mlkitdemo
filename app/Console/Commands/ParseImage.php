@@ -38,13 +38,13 @@ class ParseImage extends Command
      * @return mixed
      */
 
-    public $keywords = [];
+    public $keywords;
 
     public function handle()
     {
-        foreach (glob($this->argument('path') . "/*.jpg") as $p) {
+        foreach (glob($this->argument('path') . '/*.{png,jpeg,jpg}', GLOB_BRACE) as $p) {
             if (!file_exists($p . ".json")) {
-                $this->keywords = [];
+                $this->keywords = ['labels' => [], 'web' => [], 'text' => []];
                 print "Parsing $p\n";
                 $this->parsefile($p);
             }
@@ -58,35 +58,47 @@ class ParseImage extends Command
         $image = $client->image(fopen($f, 'r'), ['labels', 'web', 'text']);
         $response = $client->annotate($image);
 
-        foreach ($response->labels() as $label) {
-            try {
-                $this->keywords['labels'][] = $label->description();
-            } catch (\Throwable $th) {
-                // print_r($th);
+        try {
+            foreach ($response->labels() as $label) {
+                try {
+                    $this->keywords['labels'][] = $label->description();
+                } catch (\Throwable $th) {
+                    // print_r($th);
+                }
             }
+        } catch (\Throwable $e) {
+            print("labels error");
         }
 
-        foreach ($response->web()->entities() as $web) {
-            try {
-                $this->keywords['web'][] = $web->description();
-            } catch (\Throwable $th) {
-                // print_r($th);
+        try {
+            foreach ($response->web()->entities() as $web) {
+                try {
+                    $this->keywords['web'][] = $web->description();
+                } catch (\Throwable $th) {
+                    // print_r($th);
 
+                }
             }
+        } catch (\Throwable $e) {
+            print("web error");
         }
 
-        $skip = true;
-        foreach ($response->text() as $text) {
-            if ($skip) {
-                $skip = false;
-                continue;
-            }
+        try {
+            $skip = true;
+            foreach ($response->text() as $text) {
+                if ($skip) {
+                    $skip = false;
+                    continue;
+                }
 
-            try {
-                $this->keywords['text'][] = $text->description();
-            } catch (\Throwable $th) {
-                // print_r($th);
+                try {
+                    $this->keywords['text'][] = $text->description();
+                } catch (\Throwable $th) {
+                    // print_r($th);
+                }
             }
+        } catch (\Throwable $e) {
+            print("text error");
         }
 
         file_put_contents($f . '.json', json_encode($this->keywords));
